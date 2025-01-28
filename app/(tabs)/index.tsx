@@ -1,74 +1,88 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import * as Network from 'expo-network';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import * as Sentry from 'sentry-expo';
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import { theme } from '../../theme';
+import { Categories } from '../../screens/Categories';
+import { Home } from '../../screens/Home';
+import RealmContext from '../../realm';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Category } from '@/models/category';
+import { Expense } from '@/models/expense';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useNavigation } from 'expo-router';
 
-export default function HomeScreen() {
+
+const routingInstrumentation =
+  new Sentry.Native.ReactNavigationInstrumentation();
+
+const devServerPort = 8081;
+let devServerIpAddress: string | null = null;
+Network.getIpAddressAsync().then((ip) => {
+  devServerIpAddress = ip;
+});
+
+Sentry.init({
+  dsn: 'https://4d8e522ac187444fa51215c63949cc74@o1418292.ingest.sentry.io/4504486326370304',
+  // Set tracesSampleRate to 1.0 to capture 100% of transactions for performance monitoring.
+  // We recommend adjusting this value in production.
+  tracesSampleRate: 1.0,
+  enableInExpoDevelopment: true,
+  enableAutoPerformanceTracing: true,
+  enableAutoSessionTracking: true,
+  // @ts-ignore
+  attachScreenshot: true,
+
+  integrations: [
+    new Sentry.Native.ReactNativeTracing({
+      // Pass instrumentation to be used as `routingInstrumentation`
+      routingInstrumentation,
+      shouldCreateSpanForRequest: (url) => {
+        return (
+          !__DEV__ ||
+          !url.startsWith(`http://${devServerIpAddress}:${devServerPort}/logs`)
+        );
+      },
+    }),
+  ],
+});
+
+const Stack = createNativeStackNavigator();
+const { RealmProvider } = RealmContext;
+function HomeScreen() {
+  const navigation = useNavigation<any>();
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12'
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <GestureHandlerRootView   >
+    <RealmProvider schema={[Category, Expense]}>
+        <StatusBar backgroundColor={theme.colors.background} style='inverted'/>
+        <Stack.Navigator>
+          <Stack.Screen
+            options={{ headerShown: false }}
+            name='Home'
+            component={Home}
+          />
+<Stack.Screen
+  options={({ navigation }) => ({
+    headerTitleStyle: { color: theme.colors.text },
+    headerStyle: { backgroundColor: theme.colors.background },
+    headerLeft: () => (
+      <FontAwesome
+        onPress={() => navigation.goBack()}
+        name="chevron-left"
+        size={24}
+        color={theme.colors.text}
+      />
+    ),
+  })}
+  name="Categories"
+  component={Categories}
+/>
+
+        </Stack.Navigator>
+    </RealmProvider>
+    </GestureHandlerRootView>
   );
 }
 
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});
+export default Sentry.Native.wrap(HomeScreen);
